@@ -1,9 +1,6 @@
-<<<<<<< HEAD
-# The-Relief-List
-=======
 # Relief Management System – Login & Authentication Module
 
-A secure, production-ready, full-stack authentication module for the **Relief Management Web Application**. Built with Node.js, Express, PostgreSQL, React, and Tailwind CSS.
+A secure, production-ready, full-stack authentication module for the **Relief Management Web Application**. Built with Node.js, Express, MySQL, React, and Tailwind CSS.
 
 ---
 
@@ -37,20 +34,20 @@ Relief Management System/
 ├── .gitignore                    # Git ignore file for node_modules, .env, dist, etc.
 ├── README.md                     # Documentation and setup instructions
 │
-├── server/                       # Backend (Node.js + Express.js + PostgreSQL)
+├── server/                       # Backend (Node.js + Express.js + MySQL)
 │   ├── .env                      # Local environment configuration
 │   ├── .env.example              # Server environment template
 │   ├── index.js                  # Express server entry point & middleware setup
-│   ├── package.json              # Server dependencies & scripts
+│   ├── package.json              # Server dependencies & scripts (mysql2, bcryptjs, etc.)
 │   ├── config/
-│   │   └── db.js                 # PostgreSQL Pool connection & table initialization
+│   │   └── db.js                 # MySQL connection pool & table schema auto-creation
 │   ├── controllers/
 │   │   └── authController.js     # Register, Login, Logout, and GetMe controllers
 │   ├── middleware/
 │   │   ├── auth.js               # JWT verification & session decoding middleware
 │   │   └── roleAuth.js           # Role-based authorization middleware (admin/user)
 │   ├── models/
-│   │   └── User.js               # PostgreSQL User queries (findByEmail, findById, create)
+│   │   └── User.js               # Parameterized MySQL queries (findByEmail, findById, create)
 │   ├── routes/
 │   │   └── auth.js               # REST API endpoints (/register, /login, /logout, /me)
 │   ├── utils/
@@ -91,30 +88,28 @@ Relief Management System/
 |---|---|
 | **Frontend** | React 18, Vite, Tailwind CSS v3, React Router v6, Axios, React Hot Toast |
 | **Backend** | Node.js, Express.js, cookie-parser, cors, express-validator |
-| **Database** | PostgreSQL |
+| **Database** | MySQL (with `mysql2/promise`) & MySQL Workbench |
 | **Authentication** | JSON Web Tokens (`jsonwebtoken`), `httpOnly` Cookies |
-| **Security** | `bcryptjs` (12 salt rounds), SQL Parameterized Queries |
+| **Security** | `bcryptjs` (12 salt rounds), SQL Parameterized Queries (`?`) |
 
 ---
 
 ## ⚙️ Prerequisites
 
-Make sure the following are installed on your machine:
-1. **Node.js** (v18.x or later recommended) & **npm**
-2. **PostgreSQL** (v14.x or later recommended)
+1. **Node.js** (v18.x or later) & **npm**
+2. **MySQL Server** & **MySQL Workbench** (or XAMPP / WampServer)
 
 ---
 
 ## 🚀 Setup & Execution Guide
 
-### 1. Database Setup (PostgreSQL)
+### 1. Database Setup (MySQL Workbench)
 
-Open your PostgreSQL command line (`psql`) or pgAdmin and run:
-
-```sql
-CREATE DATABASE relief_management;
-```
-
+1. Open **MySQL Workbench** and connect to your local MySQL connection.
+2. In the SQL Editor, execute:
+   ```sql
+   CREATE DATABASE relief_management;
+   ```
 *(Note: The server will automatically create the `users` table on startup with proper schema, constraints, and timestamps).*
 
 ---
@@ -126,32 +121,25 @@ CREATE DATABASE relief_management;
    cd server
    ```
 
-2. Configure environment variables:
-   A ready-to-use `.env` file has been provided. You can modify it or copy from `.env.example`:
-   ```bash
-   # Windows PowerShell:
-   Copy-Item .env.example .env
-   ```
-
-   Ensure your database credentials in `server/.env` match your local PostgreSQL instance:
+2. Configure environment variables in `server/.env`:
    ```env
    PORT=5000
    NODE_ENV=development
+   CLIENT_URL=http://localhost:5173
 
    DB_HOST=localhost
-   DB_PORT=5432
-   DB_USER=postgres
-   DB_PASSWORD=your_postgres_password
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_mysql_password
    DB_NAME=relief_management
 
-   JWT_SECRET=super_secret_jwt_key_relief_management_2026_change_in_production
+   JWT_SECRET=relief_management_super_secret_jwt_key_2026_change_in_production
    JWT_EXPIRY=7d
-
-   CLIENT_URL=http://localhost:5173
 
    ADMIN_EMAIL=admin@relief.org
    ADMIN_PASSWORD=Admin@123456
    ```
+   *(If your MySQL `root` user has no password, leave `DB_PASSWORD=` blank).*
 
 3. Install backend dependencies:
    ```bash
@@ -165,7 +153,7 @@ CREATE DATABASE relief_management;
    *Output confirmation:*
    ```
    --- Relief Management System: Admin Seeding ---
-   Database initialized: "users" table is ready.
+   MySQL Database initialized: "users" table is ready.
    Admin user successfully created:
    - ID: 1
    - Name: System Administrator
@@ -260,13 +248,3 @@ CREATE DATABASE relief_management;
 #### `GET /api/auth/user/verify`
 - **Description:** User and Admin verification route (`auth` + `roleAuth('user', 'admin')`).
 - **Response:** `200 OK` with `{ "message": "User access granted" }` or `403 Forbidden`.
-
----
-
-## 🛡️ Security Highlights
-
-1. **Strict Backend Role Assignment:** Public registration completely ignores any user-provided role values and unconditionally inserts `role = 'user'`.
-2. **Double-layer Protection:** Frontend route guards provide clean UX, while Express middlewares (`auth.js` and `roleAuth.js`) independently verify JWT signatures and query current roles directly from the database.
-3. **No Sensitive Leaks:** User queries explicitly omit `password_hash` from all API responses and token payloads.
-4. **Parameterized SQL:** All queries use PostgreSQL positional placeholders (`$1`, `$2`) to eliminate SQL injection risks.
->>>>>>> origin/akash

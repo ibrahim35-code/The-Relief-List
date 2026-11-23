@@ -1,4 +1,4 @@
-# The-Relief-List — Relief Management System
+
 # Relief Management System – Login & Authentication Module
 
 A secure, production-ready, full-stack authentication module for the **Relief Management Web Application**. Built with Node.js, Express, MySQL, React, and Tailwind CSS.
@@ -39,7 +39,7 @@ Relief Management System/
 │   ├── .env                      # Local environment configuration
 │   ├── .env.example              # Server environment template
 │   ├── index.js                  # Express server entry point & middleware setup
-│   ├── package.json              # Server dependencies & scripts
+│   ├── package.json              # Server dependencies & scripts (mysql2, bcryptjs, etc.)
 │   ├── config/
 │   │   └── db.js                 # MySQL Pool connection & table initialization
 │   ├── controllers/
@@ -91,7 +91,7 @@ Relief Management System/
 | **Backend** | Node.js, Express.js, cookie-parser, cors, express-validator |
 | **Database** | MySQL |
 | **Authentication** | JSON Web Tokens (`jsonwebtoken`), `httpOnly` Cookies |
-| **Security** | `bcryptjs` (12 salt rounds), SQL Parameterized Queries |
+| **Security** | `bcryptjs` (12 salt rounds), SQL Parameterized Queries (`?`) |
 
 ---
 
@@ -135,6 +135,7 @@ CREATE DATABASE IF NOT EXISTS relief_management;
    ```env
    PORT=5000
    NODE_ENV=development
+   CLIENT_URL=http://localhost:5173
 
    DB_HOST=localhost
    DB_PORT=3306
@@ -142,14 +143,13 @@ CREATE DATABASE IF NOT EXISTS relief_management;
    DB_PASSWORD=your_mysql_password
    DB_NAME=relief_management
 
-   JWT_SECRET=super_secret_jwt_key_relief_management_2026_change_in_production
+   JWT_SECRET=relief_management_super_secret_jwt_key_2026_change_in_production
    JWT_EXPIRY=7d
-
-   CLIENT_URL=http://localhost:5173
 
    ADMIN_EMAIL=admin@relief.org
    ADMIN_PASSWORD=Admin@123456
    ```
+   *(If your MySQL `root` user has no password, leave `DB_PASSWORD=` blank).*
 
 3. Install backend dependencies:
    ```bash
@@ -163,7 +163,7 @@ CREATE DATABASE IF NOT EXISTS relief_management;
    *Output confirmation:*
    ```
    --- Relief Management System: Admin Seeding ---
-   Database initialized: "users" table is ready.
+   MySQL Database initialized: "users" table is ready.
    Admin user successfully created:
    - ID: 1
    - Name: System Administrator
@@ -258,12 +258,3 @@ CREATE DATABASE IF NOT EXISTS relief_management;
 #### `GET /api/auth/user/verify`
 - **Description:** User and Admin verification route (`auth` + `roleAuth('user', 'admin')`).
 - **Response:** `200 OK` with `{ "message": "User access granted" }` or `403 Forbidden`.
-
----
-
-## 🛡️ Security Highlights
-
-1. **Strict Backend Role Assignment:** Public registration completely ignores any user-provided role values and unconditionally inserts `role = 'user'`.
-2. **Double-layer Protection:** Frontend route guards provide clean UX, while Express middlewares (`auth.js` and `roleAuth.js`) independently verify JWT signatures and query current roles directly from the database.
-3. **No Sensitive Leaks:** User queries explicitly omit `password_hash` from all API responses and token payloads.
-4. **Parameterized SQL:** All queries use MySQL parameterized placeholders (`?`) to eliminate SQL injection risks.

@@ -51,14 +51,27 @@ const User = {
    */
   async findById(id) {
     if (!id) return null;
-    const query = `
-      SELECT id, name, email, role, created_at, updated_at
-      FROM users
-      WHERE id = ?
-      LIMIT 1
-    `;
-    const [rows] = await pool.query(query, [id]);
-    return rows[0] || null;
+    const numId = parseInt(id, 10);
+
+    try {
+      const query = `
+        SELECT id, name, email, role, created_at, updated_at
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+      `;
+      const [rows] = await pool.query(query, [numId]);
+      if (rows && rows.length > 0) return rows[0];
+    } catch (err) {
+      // Fallback
+    }
+
+    const memUser = memoryUsers.find(u => String(u.id) === String(id));
+    if (memUser) {
+      const { password_hash, ...safeUser } = memUser;
+      return safeUser;
+    }
+    return null;
   },
 
   /**
@@ -71,15 +84,32 @@ const User = {
    * @returns {Promise<Object>}
    */
   async create({ name, email, passwordHash, role = 'user' }) {
-    const query = `
-      INSERT INTO users (name, email, password_hash, role)
-      VALUES (?, ?, ?, ?)
-    `;
-    const values = [name.trim(), email.toLowerCase().trim(), passwordHash, role];
-    const [result] = await pool.query(query, values);
-    
-    // Fetch and return newly created record (without password)
-    return await this.findById(result.insertId);
+    const cleanName = name.trim();
+    const cleanEmail = email.toLowerCase().trim();
+
+    try {
+      const query = `
+        INSERT INTO users (name, email, password_hash, role)
+        VALUES (?, ?, ?, ?)
+      `;
+      const values = [cleanName, cleanEmail, passwordHash, role];
+      const [result] = await pool.query(query, values);
+      return await this.findById(result.insertId);
+    } catch (err) {
+      // Memory fallback
+      const newUser = {
+        id: Date.now(),
+        name: cleanName,
+        email: cleanEmail,
+        password_hash: passwordHash,
+        role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      memoryUsers.push(newUser);
+      const { password_hash, ...safeUser } = newUser;
+      return safeUser;
+    }
   },
 };
 

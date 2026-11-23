@@ -63,6 +63,7 @@ const startServer = async () => {
       console.log(`Server started successfully on port ${PORT}`);
       console.log(`CORS enabled for client origin: ${CLIENT_URL}`);
       console.log(`Auth routes mounted at http://localhost:${PORT}/api/auth`);
+      console.log(`Relief routes mounted at http://localhost:${PORT}/api/relief`);
     });
   } catch (error) {
     console.error('Server startup failed during database initialization:', error);

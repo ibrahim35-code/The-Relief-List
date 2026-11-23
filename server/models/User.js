@@ -1,7 +1,26 @@
 const { pool } = require('../config/db');
 
-// In-memory fallback users cache for resilience
-const memoryUsers = [];
+// In-memory fallback users cache for resilience with pre-seeded test accounts
+const memoryUsers = [
+  {
+    id: 1,
+    name: 'System Administrator',
+    email: 'admin@relief.org',
+    password_hash: '$2a$10$4wK1B6uojxab/SRrtui9p.ZBf0nkKj.XzpyFWjIRts7NUunMZygge', // Admin@123456
+    role: 'admin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    name: 'Field Volunteer',
+    email: 'volunteer@relief.org',
+    password_hash: '$2a$10$GjSKqEmsSX7lOpOh0KYTOeR/ODPfk62pk.letg0SR25oxu5BXXS5K', // Volunteer@123
+    role: 'user',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
 
 const User = {
   /**

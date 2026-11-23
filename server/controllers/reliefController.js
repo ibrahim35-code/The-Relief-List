@@ -1,188 +1,332 @@
-const ReliefEntry = require('../models/ReliefEntry');
-const { findDuplicateGroups } = require('../utils/deduplication');
+const { validationResult } = require('express-validator');
+const ReliefRequest = require('../models/ReliefRequest');
 
-const reliefController = {
-  // Get all raw entries across the 3 lists
-  async getEntries(req, res) {
-    try {
-      const entries = await ReliefEntry.getAll();
-      return res.status(200).json({
-        success: true,
-        count: entries.length,
-        entries,
+/**
+ * Submit a new relief request
+ * Supports exact channel formats:
+ * - Union Council: name, age, address
+ * - Volunteer Survey: name, age, total family members, address
+ * - Partner: name, address, wife name
+ * POST /api/relief
+ */
+const createRequest = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: errors.array()[0].msg,
+        errors: errors.array(),
       });
-    } catch (error) {
-      console.error('Error fetching entries:', error);
-      return res.status(500).json({ success: false, message: 'Failed to fetch entries' });
     }
-  },
 
-  // Add a single entry to Union Council, Own Survey, or Partner Org
-  async addEntry(req, res) {
-    try {
-      const { source_list, name, age, village, family_members, spouse_name, fathers_name, notes, raw_entry } = req.body;
+    const {
+      sourceType,
+      name,
+      beneficiaryName,
+      age,
+      familyMembers,
+      wifeName,
+      address,
+      category,
+      urgency,
+      contactNumber,
+      description,
+    } = req.body;
 
-      if (!source_list || !name || !village) {
-        return res.status(400).json({
-          success: false,
-          message: 'Source list, beneficiary name, and village/location are required.',
-        });
-      }
+    const assignedName = name || beneficiaryName;
 
-      if (!['union_council', 'own_survey', 'partner_org'].includes(source_list)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid source list. Must be union_council, own_survey, or partner_org.',
-        });
-      }
+    const newRequest = await ReliefRequest.create({
+      userId: req.user.id,
+      submittedByName: req.user.name,
+      submittedByEmail: req.user.email,
+      sourceType: sourceType || 'Volunteer Survey',
+      beneficiaryName: assignedName,
+      age: age ? parseInt(age, 10) : null,
+      familyMembers: familyMembers ? parseInt(familyMembers, 10) : null,
+      wifeName: wifeName || null,
+      address,
+      category: category || 'Food Supplies',
+      urgency: urgency || 'Medium',
+      contactNumber: contactNumber || null,
+      description: description || '',
+    });
 
-      const created = await ReliefEntry.create({
-        source_list,
-        name,
-        age,
-        village,
-        family_members,
-        spouse_name,
-        fathers_name,
-        notes,
-        raw_entry,
-        user_id: req.user ? req.user.id : null,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: 'Entry added successfully',
-        entry: created,
-      });
-    } catch (error) {
-      console.error('Error adding entry:', error);
-      return res.status(500).json({ success: false, message: 'Failed to add relief entry' });
-    }
-  },
-
-  // Bulk add entries (useful for pasting multiple lines)
-  async bulkAdd(req, res) {
-    try {
-      const { entries } = req.body;
-      if (!Array.isArray(entries) || entries.length === 0) {
-        return res.status(400).json({ success: false, message: 'Entries array is required.' });
-      }
-
-      const createdList = [];
-      for (const item of entries) {
-        if (item.name && item.village && item.source_list) {
-          const itemCreated = await ReliefEntry.create({
-            ...item,
-            user_id: req.user ? req.user.id : null,
-          });
-          createdList.push(itemCreated);
-        }
-      }
-
-      return res.status(201).json({
-        success: true,
-        message: `Imported ${createdList.length} entries successfully.`,
-        entries: createdList,
-      });
-    } catch (error) {
-      console.error('Error in bulkAdd:', error);
-      return res.status(500).json({ success: false, message: 'Bulk import failed' });
-    }
-  },
-
-  // Delete an entry
-  async deleteEntry(req, res) {
-    try {
-      const { id } = req.params;
-      await ReliefEntry.delete(id);
-      return res.status(200).json({ success: true, message: 'Entry removed successfully' });
-    } catch (error) {
-      console.error('Error deleting entry:', error);
-      return res.status(500).json({ success: false, message: 'Failed to delete entry' });
-    }
-  },
-
-  // Reset to default sample scenario from the assessment paper
-  async resetSample(req, res) {
-    try {
-      const samples = await ReliefEntry.resetSamples();
-      return res.status(200).json({
-        success: true,
-        message: "Reset to Ruma's assessment benchmark sample entries.",
-        entries: samples,
-      });
-    } catch (error) {
-      console.error('Error resetting samples:', error);
-      return res.status(500).json({ success: false, message: 'Failed to reset samples' });
-    }
-  },
-
-  // Run the Deduplication Matching Algorithm and return groups with explainable reasons
-  async getDuplicateAnalysis(req, res) {
-    try {
-      const entries = await ReliefEntry.getAll();
-      const decisions = await ReliefEntry.getDecisions();
-      const groups = findDuplicateGroups(entries, decisions);
-
-      return res.status(200).json({
-        success: true,
-        totalEntries: entries.length,
-        candidateGroupsCount: groups.length,
-        groups,
-        decisions,
-      });
-    } catch (error) {
-      console.error('Error running duplicate analysis:', error);
-      return res.status(500).json({ success: false, message: 'Analysis failed' });
-    }
-  },
-
-  // Save Ruma's decision on a candidate duplicate group
-  async recordDecision(req, res) {
-    try {
-      const {
-        group_signature,
-        entry_ids,
-        decision_type, // 'merge', 'separate', 'field_check'
-        resolved_name,
-        resolved_age,
-        resolved_village,
-        resolved_family_members,
-        resolved_spouse,
-        resolved_fathers_name,
-        notes,
-      } = req.body;
-
-      if (!group_signature || !decision_type) {
-        return res.status(400).json({
-          success: false,
-          message: 'group_signature and decision_type are required.',
-        });
-      }
-
-      const decision = await ReliefEntry.saveDecision({
-        group_signature,
-        entry_ids: Array.isArray(entry_ids) ? entry_ids : [],
-        decision_type,
-        resolved_name,
-        resolved_age,
-        resolved_village,
-        resolved_family_members,
-        resolved_spouse,
-        resolved_fathers_name,
-        notes,
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Decision saved successfully',
-        decision,
-      });
-    } catch (error) {
-      console.error('Error recording decision:', error);
-      return res.status(500).json({ success: false, message: 'Failed to record decision' });
-    }
-  },
+    return res.status(201).json({
+      success: true,
+      message: `Data recorded successfully under ${newRequest.source_type}. Queued for administrator review.`,
+      data: newRequest,
+    });
+  } catch (error) {
+    console.error('Error creating relief request:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit relief request. Please try again.',
+    });
+  }
 };
 
-module.exports = reliefController;
+/**
+ * Get submissions belonging to the logged-in user
+ * Accessible by: Regular Users & Admins (Reads own records)
+ * GET /api/relief/my
+ */
+const getMyRequests = async (req, res) => {
+  try {
+    const requests = await ReliefRequest.findByUserId(req.user.id);
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      data: requests,
+    });
+  } catch (error) {
+    console.error('Error fetching user requests:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve your relief submissions.',
+    });
+  }
+};
+
+/**
+ * Get all relief submissions across the entire system
+ * STRICTLY ADMIN ONLY
+ * GET /api/relief/all
+ */
+const getAllRequests = async (req, res) => {
+  try {
+    const { status, category, urgency, sourceType, search } = req.query;
+    const requests = await ReliefRequest.findAll({ status, category, urgency, sourceType, search });
+
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      data: requests,
+    });
+  } catch (error) {
+    console.error('Error fetching all requests (admin):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve relief requests.',
+    });
+  }
+};
+
+/**
+ * Get system summary metrics
+ * STRICTLY ADMIN ONLY
+ * GET /api/relief/stats
+ */
+const getAdminStats = async (req, res) => {
+  try {
+    const metrics = await ReliefRequest.getMetrics();
+    return res.status(200).json({
+      success: true,
+      data: metrics,
+    });
+  } catch (error) {
+    console.error('Error fetching admin metrics:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve analytics metrics.',
+    });
+  }
+};
+
+/**
+ * Get single request details by ID
+ * Users can view only their own; Admins can view any.
+ * GET /api/relief/:id
+ */
+const getRequestById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = await ReliefRequest.findById(id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Relief request not found.',
+      });
+    }
+
+    if (req.user.role !== 'admin' && request.user_id !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You do not have permission to view this request.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: request,
+    });
+  } catch (error) {
+    console.error('Error fetching request by id:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve relief request details.',
+    });
+  }
+};
+
+/**
+ * Modify a relief request (Full Edit)
+ * STRICTLY ADMIN ONLY
+ * PUT /api/relief/:id
+ */
+const updateRequest = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: errors.array()[0].msg,
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const existing = await ReliefRequest.findById(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Relief request not found.',
+      });
+    }
+
+    const {
+      sourceType,
+      name,
+      beneficiaryName,
+      age,
+      familyMembers,
+      wifeName,
+      address,
+      title,
+      category,
+      urgency,
+      contactNumber,
+      description,
+      status,
+      adminNotes,
+    } = req.body;
+
+    const assignedName = name || beneficiaryName || existing.beneficiary_name;
+
+    const updated = await ReliefRequest.update(id, {
+      sourceType: sourceType || existing.source_type,
+      beneficiaryName: assignedName,
+      age: age !== undefined ? age : existing.age,
+      familyMembers: familyMembers !== undefined ? familyMembers : existing.family_members,
+      wifeName: wifeName !== undefined ? wifeName : existing.wife_name,
+      address: address !== undefined ? address : existing.address,
+      title: title || existing.title,
+      category: category || existing.category,
+      urgency: urgency || existing.urgency,
+      location: address || existing.location,
+      contactNumber: contactNumber !== undefined ? contactNumber : existing.contact_number,
+      peopleAffected: familyMembers ? parseInt(familyMembers, 10) : existing.people_affected,
+      description: description !== undefined ? description : existing.description,
+      status: status || existing.status,
+      adminNotes: adminNotes !== undefined ? adminNotes : existing.admin_notes,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Relief request modified successfully.',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error updating relief request (admin):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update relief request.',
+    });
+  }
+};
+
+/**
+ * Fast status change
+ * STRICTLY ADMIN ONLY
+ * PATCH /api/relief/:id/status
+ */
+const updateStatus = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: errors.array()[0].msg,
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+
+    const existing = await ReliefRequest.findById(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Relief request not found.',
+      });
+    }
+
+    const updated = await ReliefRequest.updateStatus(id, status, adminNotes);
+
+    return res.status(200).json({
+      success: true,
+      message: `Request status successfully changed to ${status}.`,
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error changing status (admin):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update request status.',
+    });
+  }
+};
+
+/**
+ * Delete a relief request
+ * STRICTLY ADMIN ONLY
+ * DELETE /api/relief/:id
+ */
+const deleteRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await ReliefRequest.findById(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Relief request not found.',
+      });
+    }
+
+    await ReliefRequest.delete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Relief request deleted successfully.',
+    });
+  } catch (error) {
+    console.error('Error deleting relief request (admin):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete relief request.',
+    });
+  }
+};
+
+module.exports = {
+  createRequest,
+  getMyRequests,
+  getAllRequests,
+  getAdminStats,
+  getRequestById,
+  updateRequest,
+  updateStatus,
+  deleteRequest,
+};

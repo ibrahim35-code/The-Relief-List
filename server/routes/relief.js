@@ -1,23 +1,25 @@
 const express = require('express');
 const router = express.Router();
+
 const reliefController = require('../controllers/reliefController');
+const { reliefValidation, statusValidation } = require('../validators/reliefValidator');
 const auth = require('../middleware/auth');
+const roleAuth = require('../middleware/roleAuth');
 
-// We allow optional auth or guest fallback so that user testing is seamless
-const optionalAuth = (req, res, next) => {
-  // Try authenticating, but do not block if token is missing
-  auth(req, res, (err) => {
-    // proceed regardless
-    next();
-  });
-};
+// 1. INPUT ACCESS: Users and Admins can input/submit new relief data
+router.post('/', auth, roleAuth('user', 'admin'), reliefValidation, reliefController.createRequest);
 
-router.get('/entries', optionalAuth, reliefController.getEntries);
-router.post('/entries', optionalAuth, reliefController.addEntry);
-router.post('/bulk', optionalAuth, reliefController.bulkAdd);
-router.delete('/entries/:id', optionalAuth, reliefController.deleteEntry);
-router.post('/reset-sample', optionalAuth, reliefController.resetSample);
-router.get('/duplicates', optionalAuth, reliefController.getDuplicateAnalysis);
-router.post('/decide', optionalAuth, reliefController.recordDecision);
+// 2. READ ACCESS: Regular users can read their own submitted data
+router.get('/my', auth, reliefController.getMyRequests);
+
+// 3. READ ALL & STATS: Admin only
+router.get('/all', auth, roleAuth('admin'), reliefController.getAllRequests);
+router.get('/stats', auth, roleAuth('admin'), reliefController.getAdminStats);
+router.get('/:id', auth, reliefController.getRequestById);
+
+// 4. MODIFICATION ACCESS: STRICTLY ADMIN ONLY (Users get 403 Forbidden)
+router.put('/:id', auth, roleAuth('admin'), reliefValidation, reliefController.updateRequest);
+router.patch('/:id/status', auth, roleAuth('admin'), statusValidation, reliefController.updateStatus);
+router.delete('/:id', auth, roleAuth('admin'), reliefController.deleteRequest);
 
 module.exports = router;

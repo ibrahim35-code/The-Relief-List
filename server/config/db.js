@@ -1,42 +1,42 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-const pool = new Pool({
+// Create connection pool for MySQL
+const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT, 10) || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  port: parseInt(process.env.DB_PORT, 10) || 3306,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'relief_management',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle PostgreSQL client:', err);
-});
-
+/**
+ * Initialize MySQL database table
+ */
 const initDB = async () => {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
+      id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(100) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
+      email VARCHAR(255) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
-      role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+      role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
 
   try {
     await pool.query(createTableQuery);
-    console.log('Database initialized: "users" table is ready.');
+    console.log('MySQL Database initialized: "users" table is ready.');
   } catch (error) {
-    console.error('Failed to initialize database tables:', error);
+    console.error('Failed to initialize MySQL database tables:', error.message || error);
     throw error;
   }
 };
-
-pool.pool = pool;
-pool.initDB = initDB;
 
 module.exports = {
   pool,

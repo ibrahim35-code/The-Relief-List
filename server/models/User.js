@@ -8,8 +8,8 @@ const User = {
    */
   async findByEmail(email) {
     if (!email) return null;
-    const query = 'SELECT * FROM users WHERE LOWER(email) = LOWER($1)';
-    const { rows } = await pool.query(query, [email.trim()]);
+    const query = 'SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1';
+    const [rows] = await pool.query(query, [email.trim()]);
     return rows[0] || null;
   },
 
@@ -23,9 +23,10 @@ const User = {
     const query = `
       SELECT id, name, email, role, created_at, updated_at
       FROM users
-      WHERE id = $1
+      WHERE id = ?
+      LIMIT 1
     `;
-    const { rows } = await pool.query(query, [id]);
+    const [rows] = await pool.query(query, [id]);
     return rows[0] || null;
   },
 
@@ -41,12 +42,13 @@ const User = {
   async create({ name, email, passwordHash, role = 'user' }) {
     const query = `
       INSERT INTO users (name, email, password_hash, role)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, name, email, role, created_at, updated_at
+      VALUES (?, ?, ?, ?)
     `;
     const values = [name.trim(), email.toLowerCase().trim(), passwordHash, role];
-    const { rows } = await pool.query(query, values);
-    return rows[0];
+    const [result] = await pool.query(query, values);
+    
+    // Fetch and return newly created record (without password)
+    return await this.findById(result.insertId);
   },
 };
 

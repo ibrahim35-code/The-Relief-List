@@ -1,3 +1,4 @@
+
 # Relief Management System – Login & Authentication Module
 
 A secure, production-ready, full-stack authentication module for the **Relief Management Web Application**. Built with Node.js, Express, MySQL, React, and Tailwind CSS.
@@ -40,14 +41,14 @@ Relief Management System/
 │   ├── index.js                  # Express server entry point & middleware setup
 │   ├── package.json              # Server dependencies & scripts (mysql2, bcryptjs, etc.)
 │   ├── config/
-│   │   └── db.js                 # MySQL connection pool & table schema auto-creation
+│   │   └── db.js                 # MySQL Pool connection & table initialization
 │   ├── controllers/
 │   │   └── authController.js     # Register, Login, Logout, and GetMe controllers
 │   ├── middleware/
 │   │   ├── auth.js               # JWT verification & session decoding middleware
 │   │   └── roleAuth.js           # Role-based authorization middleware (admin/user)
 │   ├── models/
-│   │   └── User.js               # Parameterized MySQL queries (findByEmail, findById, create)
+│   │   └── User.js               # MySQL User queries (findByEmail, findById, create)
 │   ├── routes/
 │   │   └── auth.js               # REST API endpoints (/register, /login, /logout, /me)
 │   ├── utils/
@@ -88,7 +89,7 @@ Relief Management System/
 |---|---|
 | **Frontend** | React 18, Vite, Tailwind CSS v3, React Router v6, Axios, React Hot Toast |
 | **Backend** | Node.js, Express.js, cookie-parser, cors, express-validator |
-| **Database** | MySQL (with `mysql2/promise`) & MySQL Workbench |
+| **Database** | MySQL |
 | **Authentication** | JSON Web Tokens (`jsonwebtoken`), `httpOnly` Cookies |
 | **Security** | `bcryptjs` (12 salt rounds), SQL Parameterized Queries (`?`) |
 
@@ -96,21 +97,23 @@ Relief Management System/
 
 ## ⚙️ Prerequisites
 
-1. **Node.js** (v18.x or later) & **npm**
-2. **MySQL Server** & **MySQL Workbench** (or XAMPP / WampServer)
+Make sure the following are installed on your machine:
+1. **Node.js** (v18.x or later recommended) & **npm**
+2. **MySQL** (v8.x or later recommended)
 
 ---
 
 ## 🚀 Setup & Execution Guide
 
-### 1. Database Setup (MySQL Workbench)
+### 1. Database Setup (MySQL)
 
-1. Open **MySQL Workbench** and connect to your local MySQL connection.
-2. In the SQL Editor, execute:
-   ```sql
-   CREATE DATABASE relief_management;
-   ```
-*(Note: The server will automatically create the `users` table on startup with proper schema, constraints, and timestamps).*
+Open your MySQL command line or MySQL Workbench / phpMyAdmin and run:
+
+```sql
+CREATE DATABASE IF NOT EXISTS relief_management;
+```
+
+*(Note: The server will automatically create the `users`, `relief_entries`, and `relief_decisions` tables on startup with proper schema, constraints, and timestamps).*
 
 ---
 
@@ -121,7 +124,14 @@ Relief Management System/
    cd server
    ```
 
-2. Configure environment variables in `server/.env`:
+2. Configure environment variables:
+   A ready-to-use `.env` file has been provided. You can modify it or copy from `.env.example`:
+   ```bash
+   # Windows PowerShell:
+   Copy-Item .env.example .env
+   ```
+
+   Ensure your database credentials in `server/.env` match your local MySQL instance:
    ```env
    PORT=5000
    NODE_ENV=development

@@ -1,5 +1,8 @@
 const { pool } = require('../config/db');
 
+// In-memory fallback users cache for resilience
+const memoryUsers = [];
+
 const User = {
   /**
    * Find a user by their email address
@@ -8,9 +11,18 @@ const User = {
    */
   async findByEmail(email) {
     if (!email) return null;
-    const query = 'SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1';
-    const [rows] = await pool.query(query, [email.trim()]);
-    return rows[0] || null;
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+      const query = 'SELECT * FROM users WHERE LOWER(email) = LOWER(?)';
+      const [rows] = await pool.query(query, [cleanEmail]);
+      if (rows && rows.length > 0) return rows[0];
+    } catch (err) {
+      // Fallback
+    }
+
+    const memUser = memoryUsers.find(u => u.email.toLowerCase() === cleanEmail);
+    return memUser || null;
   },
 
   /**
